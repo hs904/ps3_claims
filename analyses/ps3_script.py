@@ -10,8 +10,13 @@ from sklearn.metrics import auc
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, SplineTransformer, StandardScaler
+import sys
+import os
 
+# Add the parent directory of `ps3` to the Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from ps3.data import create_sample_split, load_transform
+
 
 # %%
 # load data
@@ -22,11 +27,13 @@ df = load_transform()
 weight = df["Exposure"].values
 df["PurePremium"] = df["ClaimAmountCut"] / df["Exposure"]
 y = df["PurePremium"]
+df.head()
 # TODO: Why do you think, we divide by exposure here to arrive at our outcome variable?
-
+#Claims are proportional to the duration or level of risk insured.
+#The outcome variable (Pure Premium) represents the normalized claim intensity, enabling fair comparison and effective predictive modeling.
 
 # TODO: use your create_sample_split function here
-# df = create_sample_split(...)
+df = create_sample_split(df, "IDpol", 0.8)
 train = np.where(df["sample"] == "train")
 test = np.where(df["sample"] == "test")
 df_train = df.iloc[train].copy()
