@@ -279,4 +279,22 @@ ax.set(
 ax.legend(loc="upper left")
 plt.plot()
 
-# %%
+# %% Now let's get started with Problem Set 4!
+###############################################
+#Ex_1 Monotonicity constraints
+#1. ceate a plot of the average claims per BonusMalus group, make sure to weigh them by exposure.
+# Group data by BonusMalus and calculate weighted averages
+
+weighted_avg_claims = (
+    df.groupby("BonusMalus")
+    .apply(lambda group: np.average(group["PurePremium"], weights=group["Exposure"]))
+)
+
+# Plot the weighted average claims
+plt.figure(figsize=(10, 6))
+plt.plot(weighted_avg_claims.index, weighted_avg_claims.values, marker="o")
+plt.title("Weighted Average Claims per BonusMalus Group")
+plt.xlabel("BonusMalus")
+plt.ylabel("Weighted Average Claims")
+plt.grid()
+plt.show()
