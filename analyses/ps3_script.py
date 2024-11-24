@@ -96,12 +96,30 @@ numeric_cols = ["BonusMalus", "Density"]
 preprocessor = ColumnTransformer(
     transformers=[
         # TODO: Add numeric transforms here
+        ("numeric",
+         Pipeline(
+             [
+                 ("scale", StandardScaler()),
+                 ("spline",SplineTransformer(include_bias=False,knots="quantile")),
+             ]
+         ),
+          numeric_cols,
+        ),
         ("cat", OneHotEncoder(sparse_output=False, drop="first"), categoricals),
     ]
 )
 preprocessor.set_output(transform="pandas")
 model_pipeline = Pipeline(
     # TODO: Define pipeline steps here
+     [
+         ("preprocess",preprocessor),
+      (
+          "estimate",
+          GeneralizedLinearRegressor(
+              family=TweedieDist, l1_ratio=1, fit_intercept=True
+                ),
+        ),   
+     ]
 )
 
 # let's have a look at the pipeline
@@ -178,7 +196,12 @@ print(
 # but to save compute time here, we focus on getting the learning rate
 # and the number of estimators somewhat aligned -> tune learning_rate and n_estimators
 cv = GridSearchCV(
-
+    model_pipeline,
+    {
+        "estimate__learning_rate": [0.01, 0.02, 0.03, 0.04, 0.05, 0.1],
+        "estimate__n_estimators": [50, 100, 150, 200],
+    },
+    verbose=2,
 )
 cv.fit(X_train_t, y_train_t, estimate__sample_weight=w_train_t)
 
