@@ -50,7 +50,9 @@ y_train_t, y_test_t = y.iloc[train], y.iloc[test]
 w_train_t, w_test_t = weight[train], weight[test]
 
 TweedieDist = TweedieDistribution(1.5)
-t_glm1 = GeneralizedLinearRegressor(family=TweedieDist, l1_ratio=1, fit_intercept=True)
+#Increase the max_iter parameter in the GeneralizedLinearRegressor:
+t_glm1 = GeneralizedLinearRegressor(family=TweedieDist, l1_ratio=1, fit_intercept=True,max_iter=500)
+#max_iter should ensure the solver has enough iterations to converge.
 t_glm1.fit(X_train_t, y_train_t, sample_weight=w_train_t)
 
 
@@ -108,7 +110,6 @@ preprocessor = ColumnTransformer(
         ("cat", OneHotEncoder(sparse_output=False, drop="first"), categoricals),
     ]
 )
-preprocessor.set_output(transform="pandas")
 model_pipeline = Pipeline(
     # TODO: Define pipeline steps here
      [
@@ -195,13 +196,21 @@ print(
 # Note: Typically we tune many more parameters and larger grids,
 # but to save compute time here, we focus on getting the learning rate
 # and the number of estimators somewhat aligned -> tune learning_rate and n_estimators
+# Define the LightGBM model pipeline
+lgbm_pipeline = Pipeline(
+    [
+        ("preprocess", preprocessor),
+        ("estimate", LGBMRegressor(objective="tweedie", tweedie_variance_power=1.5)),
+    ]
+)
 cv = GridSearchCV(
-    model_pipeline,
-    {
+    lgbm_pipeline,
+    param_grid={
         "estimate__learning_rate": [0.01, 0.02, 0.03, 0.04, 0.05, 0.1],
         "estimate__n_estimators": [50, 100, 150, 200],
     },
     verbose=2,
+        cv=5,
 )
 cv.fit(X_train_t, y_train_t, estimate__sample_weight=w_train_t)
 
@@ -298,3 +307,60 @@ plt.xlabel("BonusMalus")
 plt.ylabel("Weighted Average Claims")
 plt.grid()
 plt.show()
+
+# What happens if we don’t include a monotonicity constraint?
+# Without the constraint, complex models like GBM might overfit or introduce interactions that break this expected monotonicity. This can lead to unrealistic or counterintuitive pricing strategies.
+
+# 2. introduce a monotonicity constraint for BonusMalus by setting a value of 1 in a list corresponding to all features (0 for others).
+# Define monotonicity constraints
+monotonicity_constraints = [0] * len(categoricals) + [1, 0]  
+
+# Define the constrained LGBM pipeline
+constrained_lgbm_pipeline = Pipeline(
+    [
+        ("preprocess", preprocessor),
+        ("estimate", LGBMRegressor(
+            objective="tweedie",
+            tweedie_variance_power=1.5,
+            monotone_constraints=monotonicity_constraints
+        )),
+    ]
+)
+
+#3. Cross-validate constrained LGBM
+constrained_cv = GridSearchCV(
+    constrained_lgbm_pipeline,
+    param_grid={
+        "estimate__learning_rate": [0.01, 0.02, 0.05],
+        "estimate__n_estimators": [100, 200],
+    },
+    verbose=2,
+    cv=5,
+)
+constrained_cv.fit(X_train_t, y_train_t, estimate__sample_weight=w_train_t)
+
+# Save predictions
+df_test["pp_t_lgbm_constrained"] = constrained_cv.best_estimator_.predict(X_test_t)
+df_train["pp_t_lgbm_constrained"] = constrained_cv.best_estimator_.predict(X_train_t)
+
+print(
+    "training loss t_lgbm_constrained:  {}".format(
+        TweedieDist.deviance(y_train_t, df_train["pp_t_lgbm_constrained"], sample_weight=w_train_t)
+        / np.sum(w_train_t)
+    )
+)
+
+print(
+    "testing loss t_lgbm_constrained:  {}".format(
+        TweedieDist.deviance(y_test_t, df_test["pp_t_lgbm_constrained"], sample_weight=w_test_t)
+        / np.sum(w_test_t)
+    )
+)
+
+print(
+    "Total claim amount on test set, observed = {}, predicted = {}".format(
+        df["ClaimAmountCut"].values[test].sum(),
+        np.sum(df["Exposure"].values[test] * df_test["pp_t_lgbm_constrained"]),
+    )
+)
+
