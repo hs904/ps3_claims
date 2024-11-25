@@ -2,6 +2,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import lightgbm as lgb
 from dask_ml.preprocessing import Categorizer
 from glum import GeneralizedLinearRegressor, TweedieDistribution
 from lightgbm import LGBMRegressor
@@ -364,3 +365,30 @@ print(
     )
 )
 
+
+###############################################
+#Ex_2 Learning Curve
+#1. Refit the best constrained lgbm estimator from the cross-validation and provide the tuples of the test and train dataset to the estimator via eval_set . 
+best_constrained_lgbm = constrained_cv.best_estimator_.named_steps["estimate"]
+best_constrained_lgbm.fit(
+    X_train_t,
+    y_train_t,
+    sample_weight=w_train_t,
+    eval_set=[(X_train_t, y_train_t), (X_test_t, y_test_t)],
+    eval_sample_weight=[w_train_t, w_test_t],
+    eval_metric="rmse",
+    verbose=10,
+    early_stopping_rounds=20, 
+)
+
+#2. Plot the learning curve
+# Plot learning curve
+lgb.plot_metric(best_constrained_lgbm.evals_result_, metric="rmse")
+plt.title("Learning Curve: Constrained LGBM")
+plt.xlabel("Iterations")
+plt.ylabel("Root Mean Squared Error (RMSE)")
+plt.legend(["Training", "Validation"])
+plt.grid()
+plt.show()
+
+#3. What do you notice, is the estimator tuned optimally?
