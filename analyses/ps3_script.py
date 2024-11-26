@@ -392,3 +392,31 @@ plt.grid()
 plt.show()
 
 #3. What do you notice, is the estimator tuned optimally?
+
+###############################################
+#Ex_3 Metrics Function
+from evaluation._evaluate_predictions import evaluate_predictions
+
+# Evaluate the unconstrained LGBM model
+# Use the function and compare the constrained and unconstrained lgbm models.
+metrics_unconstrained = evaluate_predictions(
+    y_true=y_test_t,
+    y_pred=df_test["pp_t_lgbm"],
+    exposure=df_test["Exposure"],
+    sample_weight=w_test_t,
+)
+
+# Evaluate the constrained LGBM model
+metrics_constrained = evaluate_predictions(
+    y_true=y_test_t,
+    y_pred=df_test["pp_t_lgbm_constrained"],
+    exposure=df_test["Exposure"],
+    sample_weight=w_test_t,
+)
+
+# Display results
+print("Unconstrained LGBM Metrics:")
+print(metrics_unconstrained)
+
+print("\nConstrained LGBM Metrics:")
+print(metrics_constrained)
