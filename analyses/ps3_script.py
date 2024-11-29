@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import lightgbm as lgb
+import dalex as dx
 from dask_ml.preprocessing import Categorizer
 from glum import GeneralizedLinearRegressor, TweedieDistribution
 from lightgbm import LGBMRegressor
@@ -420,3 +421,60 @@ print(metrics_unconstrained)
 
 print("\nConstrained LGBM Metrics:")
 print(metrics_constrained)
+
+# %% 
+# Plots the PDPs of all features and compare the PDPs between the unconstrained and constrained LGBM. 
+
+# Step 1: Define an explainer object for the constrained LGBM model
+# Pass the model, training data (X_train), and target values (y_train)
+explainer_constrained = dx.Explainer(best_constrained_lgbm, X_train_t, y_train_t)
+
+# Step 2: Compute the marginal effects (PDPs) for the constrained model
+pdp_constrained = explainer_constrained.model_profile()
+
+# Step 3: Plot PDP for the constrained model
+pdp_constrained.plot()
+
+# Step 4: Define an explainer object for the unconstrained LGBM model
+# Pass the unconstrained model, training data (X_train), and target values (y_train)
+best_unconstrained_lgbm=cv.best_estimator_.named_steps["estimate"]
+explainer_unconstrained = dx.Explainer(best_unconstrained_lgbm, X_train_t, y_train_t)
+
+# Step 5: Compute the marginal effects (PDPs) for the unconstrained model
+pdp_unconstrained = explainer_unconstrained.model_profile()
+
+# Step 6: Plot PDP for the unconstrained model
+pdp_unconstrained.plot()
+
+# Step 7: Optional: Compare the PDPs of both models
+# Create a new plot with both models' PDPs on the same graph for comparison
+fig, ax = plt.subplots(figsize=(10, 6))
+pdp_constrained.plot(ax=ax, label='Constrained Model')
+pdp_unconstrained.plot(ax=ax, label='Unconstrained Model')
+plt.legend()
+plt.show()
+
+# %%
+# Compare the decompositions of the predictions for some specific row for the constrained LGBM and our initial GLM.
+
+# Select a specific data point (e.g., the first row of the test set)
+data_point = X_test_t.iloc[[0]]
+
+# Compute SHAP decompositions for the selected data point
+shap_lgbm = explainer_constrained.predict_parts(data_point, type="shap")
+shap_glm = explainer_unconstrained.predict_parts(data_point, type="shap")
+
+# Plot the decompositions for both models
+fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+
+# SHAP decomposition plot for the constrained LGBM
+shap_lgbm.plot(show=False, ax=axes[0])
+axes[0].set_title("SHAP Decomposition - Constrained LGBM")
+
+# SHAP decomposition plot for the initial GLM
+shap_glm.plot(show=False, ax=axes[1])
+axes[1].set_title("SHAP Decomposition - Initial GLM")
+
+# Adjust layout and display the plots
+plt.tight_layout()
+plt.show()
